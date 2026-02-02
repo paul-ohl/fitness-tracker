@@ -5,8 +5,11 @@ edition = "2024"
 
 [dependencies]
 askama = "0.15.4"
+askama_web = { version = "0.15.1", features = ["axum-0.8"] }
 axum = "0.8.8"
 tokio = { version = "1.36.0", features = ["full"] }
 chrono = "0.4.43"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yml = "0.0.12"
+tower-http = { version = "0.6.8", features = ["full"] }
+tower = "0.5.3"

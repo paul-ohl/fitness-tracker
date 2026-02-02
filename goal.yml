@@ -1,0 +1,49 @@
+- name: Military press
+  target: !Weighted
+    target_weight: 75.0
+
+- name: Squat
+  target: !Weighted
+    target_weight: 115.0
+
+- name: Deadlift
+  target: !Weighted
+    target_weight: 140.0
+
+- name: Handstand pushup
+  target: !BodyweightReps
+    progression:
+    - name: Handstand pushup
+      target:
+        target_reps: 3
+    - name: Wall pushup
+      target:
+        target_reps: 5
+        target_sets: 3
+    - name: Elevated pike pushup
+      target:
+        target_reps: 10
+        target_sets: 3
+    - name: Pike pushup
+      target:
+        target_reps: 15
+        target_sets: 3
+
+- name: Handstand
+  target: !BodyweightTime
+    progression:
+    - name: Handstand x 3
+      target:
+        target_duration_seconds: 30
+        target_sets: 3
+    - name: Handstand
+      target:
+        target_duration_seconds: 30
+    - name: Bump Handstand
+      target:
+        target_duration_seconds: 60
+        target_sets: 3
+    - name: Wall Handstand w/ shoulder press
+      target:
+        target_duration_seconds: 60
+        target_sets: 3

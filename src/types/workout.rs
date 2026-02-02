@@ -3,10 +3,10 @@ use chrono::NaiveDate;
 pub struct Workout {
     pub date: NaiveDate,
     pub mood: Option<u8>,
-    pub exercises: Vec<Exercise>,
+    pub exercises: Vec<ExerciseDone>,
 }
 
-pub struct Exercise {
+pub struct ExerciseDone {
     pub name: String,
     pub sets: ExerciseSet,
 }

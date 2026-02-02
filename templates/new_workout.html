@@ -1,0 +1,43 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Workout Tracker - New workout</title>
+    <link href="static/style.css" rel="stylesheet">
+    <link rel="icon" type="image/svg" href="static/favicon.svg">
+    <link rel="stylesheet" href="https://nordcdn.net/ds/themes/9.0.0/nord-dark.css" integrity="sha384-4mfQkitA1YUssjHukrfVhopnhPw9eM2tX8Z05rZ/5NJRmDJN1fQp2gGfwydx2SzL" crossorigin="anonymous" />
+  </head>
+  <body>
+    <h1>New workout</h1>
+    <form method="post">
+      {% for exercise in workout_plan.exercises %}
+        <div>
+          {% match exercise %}
+            {% when Weighted { name, value } %}
+              <label for="ex1set1">{{ name }}</label>
+              <div style="flex flex-row">
+                <input type="number" name={{ name }} id="ex1set1" value={{ value }}>
+                kgs
+                <button><em>+</em></button>
+              </div>
+            {% when BodyweightReps { name, value } %}
+              <label for="ex1set1">{{ name }}</label>
+              <div style="flex flex-row">
+                <input type="number" name={{ name }} id="ex1set1" value={{ value }}>
+                reps
+                <button><em>+</em></button>
+              </div>
+            {% when BodyweightTime { name, value } %}
+              <label for="ex1set1">{{ name }}</label>
+              <div style="flex flex-row">
+                <input type="number" name={{ name }} id="ex1set1" value={{ value }}>
+                secs
+                <button><em>+</em></button>
+              </div>
+          {% endmatch %}
+        </div>
+      {% endfor %}
+      <input type="submit" name="submit" value="Submit">
+    </form>
+  </body>
+</html>
