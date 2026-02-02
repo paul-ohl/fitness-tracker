@@ -2,10 +2,7 @@ use askama::Template;
 use askama_web::WebTemplate;
 use axum::{Router, response::Redirect, routing::get};
 
-use crate::types::workout_plan::{
-    ExercisesPlanned::{BodyweightReps, BodyweightTime, Weighted},
-    WorkoutPlan,
-};
+use crate::types::workout_plan::{ExercisePlanned, ExercisePlannedDetails::*, WorkoutPlan};
 
 #[derive(Template, WebTemplate)]
 #[template(path = "new_workout.html")]
@@ -25,18 +22,19 @@ pub fn new_workout_router() -> Router {
 
 fn workout_template() -> WorkoutPlan {
     WorkoutPlan {
+        date: chrono::NaiveDate::from_ymd_opt(2024, 6, 15).unwrap(),
         exercises: vec![
-            Weighted {
+            ExercisePlanned {
                 name: "squat".to_string(),
-                value: 60.0,
+                details: Weighted { value: 60.0 },
             },
-            BodyweightReps {
+            ExercisePlanned {
                 name: "handstand pushup".to_string(),
-                value: 2,
+                details: BodyweightReps { value: 2 },
             },
-            BodyweightTime {
+            ExercisePlanned {
                 name: "handstand".to_string(),
-                value: 12,
+                details: BodyweightTime { value: 12 },
             },
         ],
     }

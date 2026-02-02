@@ -1,9 +1,17 @@
+use chrono::NaiveDate;
+
 pub struct WorkoutPlan {
-    pub exercises: Vec<ExercisesPlanned>,
+    pub date: NaiveDate,
+    pub exercises: Vec<ExercisePlanned>,
 }
 
-pub enum ExercisesPlanned {
-    Weighted { name: String, value: f32 },
-    BodyweightReps { name: String, value: i32 },
-    BodyweightTime { name: String, value: i32 },
+pub struct ExercisePlanned {
+    pub name: String,
+    pub details: ExercisePlannedDetails,
+}
+
+pub enum ExercisePlannedDetails {
+    Weighted { value: f32 },
+    BodyweightReps { value: i32 },
+    BodyweightTime { value: i32 },
 }

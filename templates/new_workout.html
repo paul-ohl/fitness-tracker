@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8">
@@ -8,34 +9,27 @@
     <link rel="stylesheet" href="https://nordcdn.net/ds/themes/9.0.0/nord-dark.css" integrity="sha384-4mfQkitA1YUssjHukrfVhopnhPw9eM2tX8Z05rZ/5NJRmDJN1fQp2gGfwydx2SzL" crossorigin="anonymous" />
   </head>
   <body>
+    <script>0</script>
     <h1>New workout</h1>
     <form method="post">
       {% for exercise in workout_plan.exercises %}
-        <div>
-          {% match exercise %}
-            {% when Weighted { name, value } %}
-              <label for="ex1set1">{{ name }}</label>
-              <div style="flex flex-row">
-                <input type="number" name={{ name }} id="ex1set1" value={{ value }}>
-                kgs
-                <button><em>+</em></button>
-              </div>
-            {% when BodyweightReps { name, value } %}
-              <label for="ex1set1">{{ name }}</label>
-              <div style="flex flex-row">
-                <input type="number" name={{ name }} id="ex1set1" value={{ value }}>
-                reps
-                <button><em>+</em></button>
-              </div>
-            {% when BodyweightTime { name, value } %}
-              <label for="ex1set1">{{ name }}</label>
-              <div style="flex flex-row">
-                <input type="number" name={{ name }} id="ex1set1" value={{ value }}>
-                secs
-                <button><em>+</em></button>
-              </div>
+      <div>
+        <label for="ex1set1">{{ exercise.name }}</label>
+        <div style="flex flex-row">
+          {% match exercise.details %}
+            {% when Weighted { value } %}
+              <input type="number" name={{ exercise.name }} id="ex1set1" value={{ value }}>
+              kgs
+            {% when BodyweightReps { value } %}
+              <input type="number" name={{ exercise.name }} id="ex1set1" value={{ value }}>
+              reps
+            {% when BodyweightTime { value } %}
+              <input type="number" name={{ exercise.name }} id="ex1set1" value={{ value }}>
+              secs
           {% endmatch %}
+          <button><em>+</em></button>
         </div>
+      </div>
       {% endfor %}
       <input type="submit" name="submit" value="Submit">
     </form>
