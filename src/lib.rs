@@ -1,3 +1,3 @@
-pub mod pages;
-pub mod types;
-pub mod utils;
+pub mod domain;
+pub mod inbound;
+pub mod outbound;
