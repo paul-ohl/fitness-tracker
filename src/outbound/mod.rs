@@ -1,5 +1,7 @@
-mod workout_plan_repository;
+mod exercise_repository;
 mod workout_repository;
+mod workout_template_repository;
 
-pub use workout_plan_repository::WorkoutPlanRepository;
+pub use exercise_repository::ExerciseRepository;
 pub use workout_repository::WorkoutRepository;
+pub use workout_template_repository::WorkoutTemplateRepository;

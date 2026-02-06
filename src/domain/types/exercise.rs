@@ -1,9 +1,10 @@
 pub struct ExerciseProgression {
+    pub name: String,
     pub progression: Vec<Exercise>,
 }
 
 pub struct Exercise {
-    pub id: String,
+    pub id: u64,
     pub name: String,
     pub exercise_type: ExerciseType,
 }

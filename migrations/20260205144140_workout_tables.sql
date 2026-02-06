@@ -16,7 +16,7 @@ CREATE INDEX idx_exercise_progression ON exercise(progression_name, progression_
 
 CREATE TABLE workout_template (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE workout_template_exercise (

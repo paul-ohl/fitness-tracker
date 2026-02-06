@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::{
     domain::types::workout::{
-        BodyweightRepSet, BodyweightTimeSet, ExerciseDone, ExerciseSet, WeightedSet, Workout,
+        BodyweightRepSet, BodyweightTimeSet, WeightedSet, Workout, WorkoutExercise, WorkoutSet,
     },
     state::AppState,
 };
@@ -28,7 +28,7 @@ impl TryFrom<WorkoutCreateRequest> for Workout {
         let exercises = value
             .exercises
             .into_iter()
-            .map(ExerciseDone::try_from)
+            .map(WorkoutExercise::try_from)
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Workout {
             date: value.date,
@@ -45,12 +45,12 @@ pub struct ExerciseDoneCreateRequest {
     pub sets: ExerciseSetCreateRequest,
 }
 
-impl TryFrom<ExerciseDoneCreateRequest> for ExerciseDone {
+impl TryFrom<ExerciseDoneCreateRequest> for WorkoutExercise {
     type Error = String;
 
     fn try_from(value: ExerciseDoneCreateRequest) -> Result<Self, Self::Error> {
         let sets = value.sets.try_into()?;
-        Ok(ExerciseDone {
+        Ok(WorkoutExercise {
             name: value.name,
             sets,
         })
@@ -65,7 +65,7 @@ pub enum ExerciseSetCreateRequest {
     BodyweightTime(Vec<BodyweightTimeSetCreateRequest>),
 }
 
-impl TryFrom<ExerciseSetCreateRequest> for ExerciseSet {
+impl TryFrom<ExerciseSetCreateRequest> for WorkoutSet {
     type Error = String;
 
     fn try_from(value: ExerciseSetCreateRequest) -> Result<Self, Self::Error> {
@@ -75,21 +75,21 @@ impl TryFrom<ExerciseSetCreateRequest> for ExerciseSet {
                     .into_iter()
                     .map(WeightedSet::try_from)
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(ExerciseSet::Weighted(sets))
+                Ok(WorkoutSet::Weighted(sets))
             }
             ExerciseSetCreateRequest::BodyweightReps(bodyweight_reps_sets) => {
                 let sets = bodyweight_reps_sets
                     .into_iter()
                     .map(BodyweightRepSet::try_from)
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(ExerciseSet::BodyweightReps(sets))
+                Ok(WorkoutSet::BodyweightReps(sets))
             }
             ExerciseSetCreateRequest::BodyweightTime(bodyweight_time_sets) => {
                 let sets = bodyweight_time_sets
                     .into_iter()
                     .map(BodyweightTimeSet::try_from)
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(ExerciseSet::BodyweightTime(sets))
+                Ok(WorkoutSet::BodyweightTime(sets))
             }
         }
     }

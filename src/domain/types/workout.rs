@@ -2,11 +2,6 @@ use chrono::NaiveDate;
 
 use crate::domain::types::exercise::Exercise;
 
-pub struct WorkoutTemplate {
-    pub name: String,
-    pub exercises: Vec<Exercise>,
-}
-
 pub struct Workout {
     pub id: u32,
     pub date: NaiveDate,
