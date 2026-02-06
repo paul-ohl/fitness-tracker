@@ -18,6 +18,7 @@ pub async fn new_workout_page() -> NewWorkoutTemplate {
 fn workout_template() -> WorkoutPlan {
     WorkoutPlan {
         date: chrono::NaiveDate::from_ymd_opt(2024, 6, 15).unwrap(),
+        name: "Legs and Handstand".to_string(),
         exercises: vec![
             ExercisePlanned {
                 name: "squat".to_string(),

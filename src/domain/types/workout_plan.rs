@@ -2,6 +2,7 @@ use chrono::NaiveDate;
 
 pub struct WorkoutPlan {
     pub date: NaiveDate,
+    pub name: String,
     pub exercises: Vec<ExercisePlanned>,
 }
 
