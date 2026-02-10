@@ -13,5 +13,5 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_yml = "0.0.12"
 tower-http = { version = "0.6.8", features = ["full"] }
 tower = "0.5.3"
-sqlx = { version = "0.8.6", features = [ "sqlite", "runtime-tokio-rustls", "uuid", "chrono", "json"] }
+sqlx = { version = "0.8.6", features = [ "sqlite", "runtime-tokio-rustls", "uuid", "chrono", "json", "migrate", "macros"] }
 async-trait = "0.1.89"

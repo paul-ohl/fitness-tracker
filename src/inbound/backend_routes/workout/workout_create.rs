@@ -2,13 +2,19 @@
 
 use std::sync::Arc;
 
-use axum::{Json, body::Body, extract::State, response::IntoResponse};
+use axum::{
+    Json,
+    body::{self, Body},
+    extract::State,
+    response::IntoResponse,
+};
 use chrono::NaiveDate;
 use serde::Deserialize;
 
 use crate::{
     domain::types::workout::{
-        BodyweightRepSet, BodyweightTimeSet, WeightedSet, Workout, WorkoutExercise, WorkoutSet,
+        NewBodyweightRepSet, NewBodyweightTimeSet, NewWeightedSet, NewWorkout, NewWorkoutExercise,
+        NewWorkoutSet,
     },
     state::AppState,
 };
@@ -21,16 +27,16 @@ pub struct WorkoutCreateRequest {
     pub exercises: Vec<ExerciseDoneCreateRequest>,
 }
 
-impl TryFrom<WorkoutCreateRequest> for Workout {
+impl TryFrom<WorkoutCreateRequest> for NewWorkout {
     type Error = String;
 
     fn try_from(value: WorkoutCreateRequest) -> Result<Self, Self::Error> {
         let exercises = value
             .exercises
             .into_iter()
-            .map(WorkoutExercise::try_from)
+            .map(NewWorkoutExercise::try_from)
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Workout {
+        Ok(NewWorkout {
             date: value.date,
             mood: value.mood,
             exercises,
@@ -42,16 +48,20 @@ impl TryFrom<WorkoutCreateRequest> for Workout {
 #[serde(rename_all = "camelCase")]
 pub struct ExerciseDoneCreateRequest {
     pub name: String,
-    pub sets: ExerciseSetCreateRequest,
+    pub sets: Vec<ExerciseSetCreateRequest>,
 }
 
-impl TryFrom<ExerciseDoneCreateRequest> for WorkoutExercise {
+impl TryFrom<ExerciseDoneCreateRequest> for NewWorkoutExercise {
     type Error = String;
 
     fn try_from(value: ExerciseDoneCreateRequest) -> Result<Self, Self::Error> {
-        let sets = value.sets.try_into()?;
-        Ok(WorkoutExercise {
-            name: value.name,
+        let sets = value
+            .sets
+            .into_iter()
+            .map(NewWorkoutSet::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(NewWorkoutExercise {
+            exercise_id: todo!(),
             sets,
         })
     }
@@ -60,37 +70,26 @@ impl TryFrom<ExerciseDoneCreateRequest> for WorkoutExercise {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExerciseSetCreateRequest {
-    Weighted(Vec<WeightedSetCreateRequest>),
-    BodyweightReps(Vec<BodyweightRepSetCreateRequest>),
-    BodyweightTime(Vec<BodyweightTimeSetCreateRequest>),
+    Weighted(WeightedSetCreateRequest),
+    BodyweightReps(BodyweightRepSetCreateRequest),
+    BodyweightTime(BodyweightTimeSetCreateRequest),
 }
 
-impl TryFrom<ExerciseSetCreateRequest> for WorkoutSet {
+impl TryFrom<ExerciseSetCreateRequest> for NewWorkoutSet {
     type Error = String;
 
     fn try_from(value: ExerciseSetCreateRequest) -> Result<Self, Self::Error> {
         match value {
-            ExerciseSetCreateRequest::Weighted(weighted_sets) => {
-                let sets = weighted_sets
-                    .into_iter()
-                    .map(WeightedSet::try_from)
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(WorkoutSet::Weighted(sets))
+            ExerciseSetCreateRequest::Weighted(weighted_set) => {
+                Ok(NewWorkoutSet::Weighted(weighted_set.try_into()?))
             }
-            ExerciseSetCreateRequest::BodyweightReps(bodyweight_reps_sets) => {
-                let sets = bodyweight_reps_sets
-                    .into_iter()
-                    .map(BodyweightRepSet::try_from)
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(WorkoutSet::BodyweightReps(sets))
-            }
-            ExerciseSetCreateRequest::BodyweightTime(bodyweight_time_sets) => {
-                let sets = bodyweight_time_sets
-                    .into_iter()
-                    .map(BodyweightTimeSet::try_from)
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(WorkoutSet::BodyweightTime(sets))
-            }
+
+            ExerciseSetCreateRequest::BodyweightReps(bodyweight_reps_sets) => Ok(
+                NewWorkoutSet::BodyweightReps(bodyweight_reps_sets.try_into()?),
+            ),
+            ExerciseSetCreateRequest::BodyweightTime(bodyweight_time_sets) => Ok(
+                NewWorkoutSet::BodyweightTime(bodyweight_time_sets.try_into()?),
+            ),
         }
     }
 }
@@ -98,12 +97,12 @@ impl TryFrom<ExerciseSetCreateRequest> for WorkoutSet {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WeightedSetCreateRequest {
-    pub reps: Option<u32>,
+    pub reps: Option<u16>,
     pub weight: f32,
     pub failure: Option<bool>,
 }
 
-impl TryFrom<WeightedSetCreateRequest> for WeightedSet {
+impl TryFrom<WeightedSetCreateRequest> for NewWeightedSet {
     type Error = String;
 
     fn try_from(value: WeightedSetCreateRequest) -> Result<Self, Self::Error> {
@@ -115,7 +114,7 @@ impl TryFrom<WeightedSetCreateRequest> for WeightedSet {
         if value.weight <= 0.0 {
             return Err("Weight must be greater than 0".to_string());
         }
-        Ok(WeightedSet {
+        Ok(NewWeightedSet {
             reps: value.reps.unwrap_or(1),
             weight: value.weight,
             failure: value.failure.unwrap_or(false),
@@ -126,18 +125,18 @@ impl TryFrom<WeightedSetCreateRequest> for WeightedSet {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BodyweightRepSetCreateRequest {
-    pub reps: u32,
+    pub reps: u16,
     pub failure: Option<bool>,
 }
 
-impl TryFrom<BodyweightRepSetCreateRequest> for BodyweightRepSet {
+impl TryFrom<BodyweightRepSetCreateRequest> for NewBodyweightRepSet {
     type Error = String;
 
     fn try_from(value: BodyweightRepSetCreateRequest) -> Result<Self, Self::Error> {
         if value.reps == 0 {
             return Err("Reps must be greater than 0".to_string());
         }
-        Ok(BodyweightRepSet {
+        Ok(NewBodyweightRepSet {
             reps: value.reps,
             failure: value.failure.unwrap_or(false),
         })
@@ -147,18 +146,20 @@ impl TryFrom<BodyweightRepSetCreateRequest> for BodyweightRepSet {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BodyweightTimeSetCreateRequest {
-    pub duration_seconds: u32,
+    pub duration_seconds: u16,
+    pub failure: Option<bool>,
 }
 
-impl TryFrom<BodyweightTimeSetCreateRequest> for BodyweightTimeSet {
+impl TryFrom<BodyweightTimeSetCreateRequest> for NewBodyweightTimeSet {
     type Error = String;
 
     fn try_from(value: BodyweightTimeSetCreateRequest) -> Result<Self, Self::Error> {
         if value.duration_seconds == 0 {
             return Err("Duration must be greater than 0".to_string());
         }
-        Ok(BodyweightTimeSet {
+        Ok(NewBodyweightTimeSet {
             duration_seconds: value.duration_seconds,
+            failure: value.failure.unwrap_or(false),
         })
     }
 }
@@ -167,6 +168,6 @@ pub async fn create_workout(
     State(core_logic): State<Arc<AppState>>,
     Json(workout_create_req): Json<WorkoutCreateRequest>,
 ) -> Result<impl IntoResponse, String> {
-    let workout: Workout = workout_create_req.try_into()?;
+    let workout: NewWorkout = workout_create_req.try_into()?;
     Ok("Pouet".into_response())
 }

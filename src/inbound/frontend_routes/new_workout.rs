@@ -1,8 +1,9 @@
 use askama::Template;
 use askama_web::WebTemplate;
 
-use crate::domain::types::workout_plan::{
-    ExercisePlannedDetails::*, WorkoutTemplate, WorkoutTemplateExercise,
+use crate::domain::types::{
+    exercise::{Exercise, ExerciseType},
+    workout_template::WorkoutTemplate,
 };
 
 #[derive(Template, WebTemplate)]
@@ -19,20 +20,24 @@ pub async fn new_workout_page() -> NewWorkoutTemplate {
 
 fn workout_template() -> WorkoutTemplate {
     WorkoutTemplate {
-        date: chrono::NaiveDate::from_ymd_opt(2024, 6, 15).unwrap(),
         name: "Legs and Handstand".to_string(),
         exercises: vec![
-            WorkoutTemplateExercise {
+            Exercise {
+                id: 1,
                 name: "squat".to_string(),
-                details: Weighted { value: 60.0 },
+                exercise_type: ExerciseType::Weighted { goal_weight: 100.0 },
             },
-            WorkoutTemplateExercise {
+            Exercise {
+                id: 2,
                 name: "handstand pushup".to_string(),
-                details: BodyweightReps { value: 2 },
+                exercise_type: ExerciseType::BodyweightReps { goal_reps: 2 },
             },
-            WorkoutTemplateExercise {
+            Exercise {
+                id: 3,
                 name: "handstand".to_string(),
-                details: BodyweightTime { value: 12 },
+                exercise_type: ExerciseType::BodyweightTime {
+                    goal_duration_seconds: 12,
+                },
             },
         ],
     }

@@ -1,6 +1,3 @@
-#![allow(unused)]
-
-use chrono::NaiveDate;
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 
 use crate::domain::{
@@ -14,29 +11,13 @@ pub struct ExerciseRepository {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 enum SqliteExerciseType {
     Weighted,
+    #[sqlx(rename = "bodyweight_reps")]
     BodyweightReps,
+    #[sqlx(rename = "bodyweight_time")]
     BodyweightTime,
-}
-
-impl SqliteExerciseType {
-    fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "weighted" => Some(SqliteExerciseType::Weighted),
-            "bodyweight_reps" => Some(SqliteExerciseType::BodyweightReps),
-            "bodyweight_time" => Some(SqliteExerciseType::BodyweightTime),
-            _ => None,
-        }
-    }
-
-    fn as_str(&self) -> &'static str {
-        match self {
-            SqliteExerciseType::Weighted => "weighted",
-            SqliteExerciseType::BodyweightReps => "bodyweight_reps",
-            SqliteExerciseType::BodyweightTime => "bodyweight_time",
-        }
-    }
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -45,23 +26,43 @@ struct SqliteExercise {
     pub name: String,
     pub exercise_type: SqliteExerciseType,
     pub progression_name: Option<String>,
-    pub progression_order: Option<u32>,
-    pub goal_reps: Option<u32>,
+    pub progression_order: Option<u8>,
+    pub goal_reps: Option<u16>,
     pub goal_weight: Option<f32>,
-    pub goal_duration_seconds: Option<u32>,
+    pub goal_duration_seconds: Option<u16>,
+}
+
+struct SqliteExerciseInsert {
+    pub name: String,
+    pub exercise_type: SqliteExerciseType,
+    pub progression_name: Option<String>,
+    pub progression_order: Option<u8>,
+    pub goal_reps: Option<u16>,
+    pub goal_weight: Option<f32>,
+    pub goal_duration_seconds: Option<u16>,
 }
 
 fn exercise_goals_to_sqlite(
     exercise_type: &ExerciseType,
-) -> (&'static str, Option<u32>, Option<f32>, Option<u32>) {
+) -> (SqliteExerciseType, Option<u16>, Option<f32>, Option<u16>) {
     match exercise_type {
-        ExerciseType::Weighted { goal_weight } => ("weighted", None, Some(*goal_weight), None),
-        ExerciseType::BodyweightReps { goal_reps } => {
-            ("bodyweight_reps", Some(*goal_reps), None, None)
+        ExerciseType::Weighted { goal_weight } => {
+            (SqliteExerciseType::Weighted, None, Some(*goal_weight), None)
         }
+        ExerciseType::BodyweightReps { goal_reps } => (
+            SqliteExerciseType::BodyweightReps,
+            Some(*goal_reps),
+            None,
+            None,
+        ),
         ExerciseType::BodyweightTime {
             goal_duration_seconds,
-        } => ("bodyweight_time", None, None, Some(*goal_duration_seconds)),
+        } => (
+            SqliteExerciseType::BodyweightTime,
+            None,
+            None,
+            Some(*goal_duration_seconds),
+        ),
     }
 }
 
@@ -87,9 +88,23 @@ impl From<SqliteExercise> for Exercise {
     }
 }
 
-pub enum RepositoryError {
-    NotFound,
-    DatabaseError(sqlx::Error),
+fn from_exercise_to_sqlite_insert(
+    exercise: Exercise,
+    progression_name: Option<String>,
+    progression_order: Option<u8>,
+) -> SqliteExerciseInsert {
+    let (exercise_type, goal_reps, goal_weight, goal_duration_seconds) =
+        exercise_goals_to_sqlite(&exercise.exercise_type);
+
+    SqliteExerciseInsert {
+        name: exercise.name,
+        exercise_type,
+        progression_name,
+        progression_order,
+        goal_reps,
+        goal_weight,
+        goal_duration_seconds,
+    }
 }
 
 impl ExerciseRepository {
@@ -103,7 +118,7 @@ impl ExerciseRepository {
 
     async fn get_repository_exercise_by_id(
         &self,
-        id: u32,
+        id: u64,
     ) -> Result<SqliteExercise, ExerciseModelError> {
         sqlx::query_as(
             r#"
@@ -120,11 +135,34 @@ impl ExerciseRepository {
             other => ExerciseModelError::DatabaseError(other.to_string()),
         })
     }
+
+    async fn add_exercise(
+        &mut self,
+        exercise: SqliteExerciseInsert,
+    ) -> Result<(), ExerciseModelError> {
+        sqlx::query(
+            r#"
+            INSERT INTO exercise (name, exercise_type, progression_name, progression_order, goal_reps, goal_weight, goal_duration_seconds)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(&exercise.name)
+        .bind(&exercise.exercise_type)
+        .bind(&exercise.progression_name)
+        .bind(&exercise.progression_order)
+        .bind(&exercise.goal_reps)
+        .bind(&exercise.goal_weight)
+        .bind(&exercise.goal_duration_seconds)
+        .execute(&self.db_pool)
+        .await
+        .map_err(|e| ExerciseModelError::DatabaseError(e.to_string()))?;
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
 impl ExerciseModel for ExerciseRepository {
-    async fn get_exercise_by_id(&self, id: u32) -> Result<Exercise, ExerciseModelError> {
+    async fn get_exercise_by_id(&self, id: u64) -> Result<Exercise, ExerciseModelError> {
         self.get_repository_exercise_by_id(id).await.map(Into::into)
     }
 
@@ -133,7 +171,6 @@ impl ExerciseModel for ExerciseRepository {
             r#"
             SELECT id, name, exercise_type, progression_name, progression_order, goal_reps, goal_weight, goal_duration_seconds
             FROM exercise
-            ORDER BY name
             "#,
         )
         .fetch_all(&self.db_pool)
@@ -145,24 +182,8 @@ impl ExerciseModel for ExerciseRepository {
     }
 
     async fn add_exercise(&mut self, exercise: Exercise) -> Result<(), ExerciseModelError> {
-        let (exercise_type, goal_reps, goal_weight, goal_duration_seconds) =
-            exercise_goals_to_sqlite(&exercise.exercise_type);
-
-        sqlx::query(
-            r#"
-            INSERT INTO exercise (name, exercise_type, goal_reps, goal_weight, goal_duration_seconds)
-            VALUES ($1, $2, $3, $4, $5)
-            "#,
-        )
-        .bind(&exercise.name)
-        .bind(exercise_type)
-        .bind(goal_reps)
-        .bind(goal_weight)
-        .bind(goal_duration_seconds)
-        .execute(&self.db_pool)
-        .await
-        .map_err(|e| ExerciseModelError::DatabaseError(e.to_string()))?;
-        Ok(())
+        self.add_exercise(from_exercise_to_sqlite_insert(exercise, None, None))
+            .await
     }
 
     async fn update_exercise(&mut self, exercise: Exercise) -> Result<(), ExerciseModelError> {
@@ -192,7 +213,7 @@ impl ExerciseModel for ExerciseRepository {
         Ok(())
     }
 
-    async fn delete_exercise(&mut self, id: u32) -> Result<(), ExerciseModelError> {
+    async fn delete_exercise(&mut self, id: u64) -> Result<(), ExerciseModelError> {
         let result = sqlx::query("DELETE FROM exercise WHERE id = $1")
             .bind(id as i64)
             .execute(&self.db_pool)
@@ -242,7 +263,7 @@ impl ExerciseModel for ExerciseRepository {
 
     async fn get_exercise_progression(
         &self,
-        exercise_id: u32,
+        exercise_id: u64,
     ) -> Result<ExerciseProgression, ExerciseModelError> {
         match self
             .get_repository_exercise_by_id(exercise_id)
@@ -269,9 +290,7 @@ impl ExerciseModel for ExerciseRepository {
         .bind(name)
         .fetch_all(&self.db_pool)
         .await
-        .map_err(|e| {
-            ExerciseModelError::DatabaseError(e.to_string())
-        })?;
+        .map_err(|e| ExerciseModelError::DatabaseError(e.to_string()))?;
 
         if exercises.is_empty() {
             return Err(ExerciseModelError::NotFound);
@@ -282,4 +301,349 @@ impl ExerciseModel for ExerciseRepository {
             progression: exercises.into_iter().map(Into::into).collect(),
         })
     }
+
+    async fn add_exercise_progression(
+        &mut self,
+        progression: ExerciseProgression,
+    ) -> Result<(), ExerciseModelError> {
+        let pouet = progression
+            .progression
+            .into_iter()
+            .enumerate()
+            .map(|(index, exercise)| {
+                from_exercise_to_sqlite_insert(
+                    exercise,
+                    Some(progression.name.clone()),
+                    Some(index as u8),
+                )
+            })
+            .map(|exercise| self.add_exercise(exercise))
+            .collect::<Vec<_>>();
+        let other = tokio::try_join!(pouet);
+        Ok(())
+    }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     fn make_repo(pool: sqlx::SqlitePool) -> ExerciseRepository {
+//         ExerciseRepository { db_pool: pool }
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_exercise_by_id_returns_exercise_when_exists(pool: sqlx::SqlitePool) {
+//         sqlx::query("INSERT INTO exercise (name, exercise_type, goal_weight) VALUES ($1, $2, $3)")
+//             .bind("squat")
+//             .bind("weighted")
+//             .bind(60.0)
+//             .execute(&pool)
+//             .await
+//             .unwrap();
+//
+//         let repo = make_repo(pool);
+//         let exercise = repo
+//             .get_exercise_by_id(1)
+//             .await
+//             .expect("fetch should succeed");
+//
+//         assert_eq!(exercise.id, 1);
+//         assert_eq!(exercise.name, "squat");
+//         match &exercise.exercise_type {
+//             ExerciseType::Weighted { goal_weight } => assert_eq!(*goal_weight, 60.0),
+//             _ => panic!("expected Weighted exercise type"),
+//         }
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_exercise_by_id_returns_not_found_when_missing(pool: sqlx::SqlitePool) {
+//         let repo = make_repo(pool);
+//         let result = repo.get_exercise_by_id(999).await;
+//         assert!(matches!(result, Err(ExerciseModelError::NotFound)));
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_all_exercises_returns_empty_when_no_exercises(pool: sqlx::SqlitePool) {
+//         let repo = make_repo(pool);
+//         let exercises = repo.get_all_exercises().await.expect("should succeed");
+//         assert!(exercises.is_empty());
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_all_exercises_returns_all_exercises(pool: sqlx::SqlitePool) {
+//         sqlx::query(
+//             "INSERT INTO exercise (name, exercise_type, goal_reps) VALUES ('pushup', 'bodyweight_reps', 10)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//         sqlx::query(
+//             "INSERT INTO exercise (name, exercise_type, goal_weight) VALUES ('squat', 'weighted', 60.0)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//
+//         let repo = make_repo(pool);
+//         let exercises = repo.get_all_exercises().await.expect("should succeed");
+//
+//         assert_eq!(exercises.len(), 2);
+//         let names: std::collections::HashSet<_> =
+//             exercises.iter().map(|e| e.name.as_str()).collect();
+//         assert!(names.contains("pushup"));
+//         assert!(names.contains("squat"));
+//     }
+//
+//     #[sqlx::test]
+//     async fn add_exercise_inserts_weighted_exercise(pool: sqlx::SqlitePool) {
+//         let mut repo = make_repo(pool);
+//         let exercise = Exercise {
+//             id: 0,
+//             name: "bench press".to_string(),
+//             exercise_type: ExerciseType::Weighted { goal_weight: 80.0 },
+//         };
+//
+//         repo.add_exercise(exercise)
+//             .await
+//             .expect("add should succeed");
+//
+//         let fetched = repo.get_exercise_by_id(1).await.expect("should exist");
+//         assert_eq!(fetched.name, "bench press");
+//         match &fetched.exercise_type {
+//             ExerciseType::Weighted { goal_weight } => assert_eq!(*goal_weight, 80.0),
+//             _ => panic!("expected Weighted"),
+//         }
+//     }
+//
+//     #[sqlx::test]
+//     async fn add_exercise_inserts_bodyweight_reps_exercise(pool: sqlx::SqlitePool) {
+//         let mut repo = make_repo(pool);
+//         let exercise = Exercise {
+//             id: 0,
+//             name: "pullup".to_string(),
+//             exercise_type: ExerciseType::BodyweightReps { goal_reps: 8 },
+//         };
+//
+//         repo.add_exercise(exercise)
+//             .await
+//             .expect("add should succeed");
+//
+//         let fetched = repo.get_exercise_by_id(1).await.expect("should exist");
+//         match &fetched.exercise_type {
+//             ExerciseType::BodyweightReps { goal_reps } => assert_eq!(*goal_reps, 8),
+//             _ => panic!("expected BodyweightReps"),
+//         }
+//     }
+//
+//     #[sqlx::test]
+//     async fn add_exercise_inserts_bodyweight_time_exercise(pool: sqlx::SqlitePool) {
+//         let mut repo = make_repo(pool);
+//         let exercise = Exercise {
+//             id: 0,
+//             name: "plank".to_string(),
+//             exercise_type: ExerciseType::BodyweightTime {
+//                 goal_duration_seconds: 60,
+//             },
+//         };
+//
+//         repo.add_exercise(exercise)
+//             .await
+//             .expect("add should succeed");
+//
+//         let fetched = repo.get_exercise_by_id(1).await.expect("should exist");
+//         match &fetched.exercise_type {
+//             ExerciseType::BodyweightTime {
+//                 goal_duration_seconds,
+//             } => {
+//                 assert_eq!(*goal_duration_seconds, 60)
+//             }
+//             _ => panic!("expected BodyweightTime"),
+//         }
+//     }
+//
+//     #[sqlx::test]
+//     async fn update_exercise_modifies_existing(pool: sqlx::SqlitePool) {
+//         sqlx::query(
+//             "INSERT INTO exercise (name, exercise_type, goal_weight) VALUES ('squat', 'weighted', 60.0)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//
+//         let mut repo = make_repo(pool);
+//         let exercise = Exercise {
+//             id: 1,
+//             name: "front squat".to_string(),
+//             exercise_type: ExerciseType::Weighted { goal_weight: 70.0 },
+//         };
+//
+//         repo.update_exercise(exercise)
+//             .await
+//             .expect("update should succeed");
+//
+//         let fetched = repo.get_exercise_by_id(1).await.expect("should exist");
+//         assert_eq!(fetched.name, "front squat");
+//         match &fetched.exercise_type {
+//             ExerciseType::Weighted { goal_weight } => assert_eq!(*goal_weight, 70.0),
+//             _ => panic!("expected Weighted"),
+//         }
+//     }
+//
+//     #[sqlx::test]
+//     async fn update_exercise_returns_not_found_when_missing(pool: sqlx::SqlitePool) {
+//         let mut repo = make_repo(pool);
+//         let exercise = Exercise {
+//             id: 999,
+//             name: "phantom".to_string(),
+//             exercise_type: ExerciseType::Weighted { goal_weight: 50.0 },
+//         };
+//
+//         let result = repo.update_exercise(exercise).await;
+//         assert!(matches!(result, Err(ExerciseModelError::NotFound)));
+//     }
+//
+//     #[sqlx::test]
+//     async fn delete_exercise_removes_existing(pool: sqlx::SqlitePool) {
+//         sqlx::query(
+//             "INSERT INTO exercise (name, exercise_type, goal_weight) VALUES ('squat', 'weighted', 60.0)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//
+//         let mut repo = make_repo(pool);
+//         repo.delete_exercise(1)
+//             .await
+//             .expect("delete should succeed");
+//
+//         let result = repo.get_exercise_by_id(1).await;
+//         assert!(matches!(result, Err(ExerciseModelError::NotFound)));
+//     }
+//
+//     #[sqlx::test]
+//     async fn delete_exercise_returns_not_found_when_missing(pool: sqlx::SqlitePool) {
+//         let mut repo = make_repo(pool);
+//         let result = repo.delete_exercise(999).await;
+//         assert!(matches!(result, Err(ExerciseModelError::NotFound)));
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_all_exercise_progressions_returns_empty_when_none(pool: sqlx::SqlitePool) {
+//         sqlx::query(
+//             "INSERT INTO exercise (name, exercise_type, goal_reps) VALUES ('pushup', 'bodyweight_reps', 10)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//
+//         let repo = make_repo(pool);
+//         let progressions = repo
+//             .get_all_exercise_progressions()
+//             .await
+//             .expect("should succeed");
+//         assert!(progressions.is_empty());
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_all_exercise_progressions_returns_progressions(pool: sqlx::SqlitePool) {
+//         sqlx::query(
+//             "INSERT INTO exercise (name, exercise_type, progression_name, progression_order, goal_reps) VALUES
+//              ('pushup incline', 'bodyweight_reps', 'pushup', 1, 10),
+//              ('pushup knees', 'bodyweight_reps', 'pushup', 2, 15),
+//              ('pushup', 'bodyweight_reps', 'pushup', 3, 20)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//
+//         let repo = make_repo(pool);
+//         let progressions = repo
+//             .get_all_exercise_progressions()
+//             .await
+//             .expect("should succeed");
+//
+//         assert_eq!(progressions.len(), 1);
+//         assert_eq!(progressions[0].name, "pushup");
+//         assert_eq!(progressions[0].progression.len(), 3);
+//         assert_eq!(progressions[0].progression[0].name, "pushup incline");
+//         assert_eq!(progressions[0].progression[1].name, "pushup knees");
+//         assert_eq!(progressions[0].progression[2].name, "pushup");
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_exercise_progression_returns_progression_when_exists(pool: sqlx::SqlitePool) {
+//         sqlx::query(
+//             "INSERT INTO exercise (id, name, exercise_type, progression_name, progression_order, goal_reps) VALUES
+//              (1, 'pushup incline', 'bodyweight_reps', 'pushup', 1, 10),
+//              (2, 'pushup', 'bodyweight_reps', 'pushup', 2, 20)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//
+//         let repo = make_repo(pool);
+//         let progression = repo
+//             .get_exercise_progression(1)
+//             .await
+//             .expect("should succeed");
+//
+//         assert_eq!(progression.name, "pushup");
+//         assert_eq!(progression.progression.len(), 2);
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_exercise_progression_returns_not_found_when_no_progression(
+//         pool: sqlx::SqlitePool,
+//     ) {
+//         sqlx::query(
+//             "INSERT INTO exercise (name, exercise_type, goal_weight) VALUES ('squat', 'weighted', 60.0)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//
+//         let repo = make_repo(pool);
+//         let result = repo.get_exercise_progression(1).await;
+//         assert!(matches!(result, Err(ExerciseModelError::NotFound)));
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_exercise_progression_returns_not_found_when_exercise_missing(
+//         pool: sqlx::SqlitePool,
+//     ) {
+//         let repo = make_repo(pool);
+//         let result = repo.get_exercise_progression(999).await;
+//         assert!(matches!(result, Err(ExerciseModelError::NotFound)));
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_exercise_progression_from_name_returns_progression(pool: sqlx::SqlitePool) {
+//         sqlx::query(
+//             "INSERT INTO exercise (name, exercise_type, progression_name, progression_order, goal_reps) VALUES
+//              ('pushup incline', 'bodyweight_reps', 'pushup', 1, 10),
+//              ('pushup', 'bodyweight_reps', 'pushup', 2, 20)",
+//         )
+//         .execute(&pool)
+//         .await
+//         .unwrap();
+//
+//         let repo = make_repo(pool);
+//         let progression = repo
+//             .get_exercise_progression_from_name("pushup")
+//             .await
+//             .expect("should succeed");
+//
+//         assert_eq!(progression.name, "pushup");
+//         assert_eq!(progression.progression.len(), 2);
+//     }
+//
+//     #[sqlx::test]
+//     async fn get_exercise_progression_from_name_returns_not_found_when_missing(
+//         pool: sqlx::SqlitePool,
+//     ) {
+//         let repo = make_repo(pool);
+//         let result = repo.get_exercise_progression_from_name("nonexistent").await;
+//         assert!(matches!(result, Err(ExerciseModelError::NotFound)));
+//     }
+// }

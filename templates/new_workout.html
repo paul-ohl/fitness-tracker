@@ -10,21 +10,21 @@
   </head>
   <body>
     <script>0</script>
-    <h1>New workout</h1>
+    <h1>New workout: {{ workout_plan.name }}</h1>
     <form method="post">
       {% for exercise in workout_plan.exercises %}
       <div>
         <label for="ex1set1">{{ exercise.name }}</label>
         <div style="flex flex-row">
-          {% match exercise.details %}
-            {% when Weighted { value } %}
-              <input type="number" name={{ exercise.name }} id="ex1set1" value={{ value }}>
+          {% match exercise.exercise_type %}
+            {% when ExerciseType::Weighted { goal_weight } %}
+              <input type="number" name={{ exercise.name }} id="ex1set1" value="10">
               kgs
-            {% when BodyweightReps { value } %}
-              <input type="number" name={{ exercise.name }} id="ex1set1" value={{ value }}>
+            {% when ExerciseType::BodyweightReps { goal_reps } %}
+              <input type="number" name={{ exercise.name }} id="ex1set1" value="10">
               reps
-            {% when BodyweightTime { value } %}
-              <input type="number" name={{ exercise.name }} id="ex1set1" value={{ value }}>
+            {% when ExerciseType::BodyweightTime { goal_duration_seconds } %}
+              <input type="number" name={{ exercise.name }} id="ex1set1" value="10">
               secs
           {% endmatch %}
           <button><em>+</em></button>
