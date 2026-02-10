@@ -29,4 +29,12 @@ pub trait ExerciseModel: Send + Sync {
         &mut self,
         progression: ExerciseProgression,
     ) -> Result<(), ExerciseModelError>;
+    async fn update_exercise_progression(
+        &mut self,
+        progression: ExerciseProgression,
+    ) -> Result<(), ExerciseModelError>;
+    async fn delete_exercise_progression(
+        &mut self,
+        progression: ExerciseProgression,
+    ) -> Result<(), ExerciseModelError>;
 }

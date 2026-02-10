@@ -20,6 +20,7 @@ pub async fn new_workout_page() -> NewWorkoutTemplate {
 
 fn workout_template() -> WorkoutTemplate {
     WorkoutTemplate {
+        id: 1,
         name: "Legs and Handstand".to_string(),
         exercises: vec![
             Exercise {

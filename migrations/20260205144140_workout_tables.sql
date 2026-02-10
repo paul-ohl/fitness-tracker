@@ -8,8 +8,7 @@ CREATE TABLE exercise (
   -- Goals to reach
   goal_reps INTEGER CHECK (goal_reps IS NULL OR goal_reps > 0),
   goal_weight REAL CHECK (goal_weight IS NULL OR goal_weight > 0),
-  goal_duration_seconds INTEGER CHECK (goal_duration_seconds IS NULL OR goal_duration_seconds > 0),
-  UNIQUE (progression_name, progression_order)
+  goal_duration_seconds INTEGER CHECK (goal_duration_seconds IS NULL OR goal_duration_seconds > 0)
 );
 
 CREATE INDEX idx_exercise_progression ON exercise(progression_name, progression_order);
